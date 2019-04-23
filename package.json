@@ -1,0 +1,31 @@
+{
+  "name": "tak-parsers",
+  "version": "1.0.0",
+  "description": "Helper parsers for multiple TAK file formats",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "hpi-lib": "github:clokken/hpi-lib"
+  },
+  "devDependencies": {
+    "@types/node": "^11.13.4",
+    "del": "^4.1.0",
+    "gulp": "^4.0.1",
+    "gulp-sourcemaps": "^2.6.5",
+    "gulp-typescript": "^5.0.1",
+    "nodemon": "^1.18.7",
+    "ts-node": "^7.0.1",
+    "typescript": "^3.2.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:clokken/tak-parsers.git"
+  },
+  "author": "clokken",
+  "license": "MIT",
+  "private": true
+}
