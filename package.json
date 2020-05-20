@@ -5,21 +5,20 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "gulp default",
     "prepare": "npm run build"
   },
   "dependencies": {
-    "hpi-lib": "github:clokken/hpi-lib"
+    "del": "^5.1.0",
+    "gulp": "^4.0.2",
+    "gulp-sourcemaps": "^2.6.5",
+    "gulp-typescript": "^6.0.0-alpha.1",
+    "nodemon": "^2.0.4",
+    "ts-node": "^8.10.1",
+    "typescript": "^3.9.3"
   },
   "devDependencies": {
-    "@types/node": "^11.13.4",
-    "del": "^4.1.0",
-    "gulp": "^4.0.1",
-    "gulp-sourcemaps": "^2.6.5",
-    "gulp-typescript": "^5.0.1",
-    "nodemon": "^1.18.7",
-    "ts-node": "^7.0.1",
-    "typescript": "^3.2.1"
+    "@types/node": "^14.0.4"
   },
   "repository": {
     "type": "git",

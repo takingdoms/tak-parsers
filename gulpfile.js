@@ -26,7 +26,7 @@ function watch() {
 }
 
 const build = gulp.parallel(buildTs);
-const defaultTask = gulp.parallel(clean, build);
+const defaultTask = gulp.series(clean, buildTs);
 
 exports.default = defaultTask;
 exports.build = build;
