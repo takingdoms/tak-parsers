@@ -49,8 +49,7 @@ enum State {
 }
 
 const SYMBOLS = ['[', ']', '{', '}', '=', ';'];
-
-const COMMENT = '#';
+const COMMENT = '//';
 
 function isSymbol(str: string) {
     return SYMBOLS.some(next => next === str);
@@ -84,10 +83,20 @@ export const FBIParser = {
                 let char = line[charIdx];
                 last = char;
 
-                /*if (char === COMMENT) {
-                    // skip the entire line
-                    continue outer;
-                }*/
+                for (let comIdx = 0; comIdx < COMMENT.length; comIdx++) {
+                    let testIdx = charIdx + comIdx;
+                    if (testIdx === line.length)
+                        break;
+
+                    let testChar = line[testIdx];
+                    if (testChar !== COMMENT[comIdx])
+                        break;
+
+                    if (comIdx === COMMENT.length - 1) {
+                        // skip the entire line
+                        continue outer;
+                    }
+                }
 
                 if (state === State.Content) {
                     if (isWhitespace(char)) {
