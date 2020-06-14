@@ -60,8 +60,25 @@ function isWhitespace(str: string) {
     return str === '\0' || /\s/.test(str);
 }
 
-export const FBIParser = {
-    load(data: Buffer) {
+export interface FBIParserOptions {
+    strict?: boolean; // default: true
+}
+
+export interface FBIParserResult {
+    value?: FBISection;
+    error?: FBIParserError;
+}
+
+export class FBIParserContext {
+    private options: FBIParserOptions;
+
+    constructor(options?: FBIParserOptions) {
+        this.options = {
+            strict: options?.strict !== undefined ? options.strict : true,
+        };
+    }
+
+    loadResult(data: Buffer): FBIParserResult {
         let str = data.toString('utf8');
         let lines = str.split('\n').map(line => line.split(''));
 
@@ -108,11 +125,11 @@ export const FBIParser = {
                         name = '';
                     }
                     else if (char === '{') {
-                        throw new ParserError(char, lineIdx, charIdx);
+                        return { error: new FBIParserError(char, lineIdx, charIdx) };
                     }
                     else if (char === '}') {
                         if (sectionStack.length === 1) {
-                            throw new ParserError(char, lineIdx, charIdx, `There was no "{" to close.`);
+                            return { error: new FBIParserError(char, lineIdx, charIdx, `There was no "{" to close.`) };
                         }
 
                         state = State.Content;
@@ -120,7 +137,10 @@ export const FBIParser = {
                         topSection = sectionStack[sectionStack.length - 1];
                     }
                     else if (isSymbol(char)) {
-                        throw new ParserError(char, lineIdx, charIdx);
+                        if (!this.options.strict && char === ';')
+                            continue;
+
+                        return { error: new FBIParserError(char, lineIdx, charIdx) };
                     }
                     else {
                         state = State.FieldName;
@@ -132,7 +152,7 @@ export const FBIParser = {
                         let nextChar = charIdx < line.length - 1 ? line[charIdx + 1] : null;
 
                         if (name.length > 0 && !isWhitespace(nextChar) && nextChar !== ']') {
-                            throw new ParserError(char, lineIdx, charIdx, `There can't be whitespace inside a header's name.`);
+                            return { error: new FBIParserError(char, lineIdx, charIdx, `There can't be whitespace inside a header's name.`) };
                         }
 
                         continue;
@@ -147,7 +167,7 @@ export const FBIParser = {
                         topSection = newSection;
                     }
                     else if (isSymbol(char)) {
-                        throw new ParserError(char, lineIdx, charIdx, `Can't have symbols inside a header's name.`);
+                        return { error: new FBIParserError(char, lineIdx, charIdx, `Can't have symbols inside a header's name.`) };
                     }
                     else {
                         name += char;
@@ -162,7 +182,7 @@ export const FBIParser = {
                         state = State.Content;
                     }
                     else {
-                        throw new ParserError(char, lineIdx, charIdx);
+                        return { error: new FBIParserError(char, lineIdx, charIdx) };
                     }
                 }
                 else if (state === State.FieldName) {
@@ -170,7 +190,10 @@ export const FBIParser = {
                         let nextChar = charIdx < line.length - 1 ? line[charIdx + 1] : null;
 
                         if (!isWhitespace(nextChar) && nextChar !== '=') {
-                            throw new ParserError(char, lineIdx, charIdx, `There can't be whitespace inside a field's name.`);
+                            console.log('@');
+                            console.log('|' + char + '|');
+                            console.log('@');
+                            return { error: new FBIParserError(char, lineIdx, charIdx, `There can't be whitespace inside a field's name.`) };
                         }
 
                         continue;
@@ -181,7 +204,7 @@ export const FBIParser = {
                         fieldValue = '';
                     }
                     else if (isSymbol(char)) {
-                        throw new ParserError(char, lineIdx, charIdx, 'Invalid field definition.');
+                        return { error: new FBIParserError(char, lineIdx, charIdx, 'Invalid field definition.') };
                     }
                     else {
                         fieldName += char;
@@ -196,7 +219,7 @@ export const FBIParser = {
                         });
                     }
                     else if (isSymbol(char)) {
-                        throw new ParserError(char, lineIdx, charIdx, 'Invalid field definition.');
+                        return { error: new FBIParserError(char, lineIdx, charIdx, 'Invalid field definition.') };
                     }
                     else {
                         fieldValue += char;
@@ -206,18 +229,48 @@ export const FBIParser = {
         }
 
         if (state !== State.Content) {
-            throw new Error(`Incomplete file. Maybe you're missing a ] or }.`);1
+            return { error: new FBIParserError(null, null, null, `Incomplete file. Maybe you're missing a ] or }.`) };
         }
 
-        return topSection;
+        return { value: topSection };
+    }
+
+    load(data: Buffer) { // for backward compatibility
+        let result = this.loadResult(data);
+        if (result.error)
+            throw result.error;
+        return result.value;
     }
 }
 
-class ParserError extends Error {
-    constructor(char: string, lineIdx: number, charIdx: number, msg?: string) {
-        let str = `Invalid character "${char}" at ${lineIdx + 1}:${charIdx + 1}`;
-        if (msg) str += `\n${msg}`;
+export class FBIParserError extends Error {
+    readonly char: string;
+    readonly lineIdx: number;
+    readonly charIdx: number;
+    readonly reason: string;
 
-        super(str);
+    constructor(char: string, lineIdx: number, charIdx: number, reason?: string) {
+        let charSanitized = char;
+
+        [
+            ['\r', '␍'],
+            ['\n', '␤'],
+            ['\0', '␀'],
+        ].forEach(([a, b]) => {
+            charSanitized = charSanitized.replace(a, b);
+        });
+
+        let message = `Invalid character "${charSanitized}" at ${lineIdx + 1}:${charIdx + 1}`;
+        if (reason) message += `\n${reason}`;
+
+        super(message);
+
+        this.char = char;
+        this.lineIdx = lineIdx;
+        this.charIdx = charIdx;
+        this.reason = reason;
     }
 }
+
+// for backward compatibility
+export const FBIParser = new FBIParserContext();
