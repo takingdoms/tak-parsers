@@ -1,6 +1,6 @@
 {
   "name": "tak-parsers",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Helper parsers for multiple TAK file formats",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

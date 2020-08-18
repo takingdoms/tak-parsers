@@ -62,6 +62,9 @@ function isWhitespace(str: string) {
 
 export interface FBIParserOptions {
     strict?: boolean; // default: true
+    formatFieldName?: (fieldName: string) => string;    // these formatters are useful for forcing lowercase for example
+    formatFieldValue?: (fieldValue: string) => string;
+    formatSectionHeader?: (sectionHeader: string) => string;
 }
 
 export interface FBIParserResult {
@@ -161,7 +164,12 @@ export class FBIParserContext {
                     if (char === ']') {
                         state = State.HeaderEnd;
 
-                        let newSection = new FBISection(name.trim());
+                        let newSection = new FBISection(
+                            this.options.formatSectionHeader
+                                ? this.options.formatSectionHeader(name.trim())
+                                : name.trim()
+                        );
+
                         topSection.sections.push(newSection);
                         sectionStack.push(newSection);
                         topSection = newSection;
@@ -214,8 +222,12 @@ export class FBIParserContext {
                     if (char === ';') {
                         state = State.Content;
                         topSection.fields.push({
-                            name: fieldName,
-                            value: fieldValue.trim()
+                            name: this.options.formatFieldName
+                                ? this.options.formatFieldName(fieldName)
+                                : fieldName,
+                            value: this.options.formatFieldValue
+                                ? this.options.formatFieldValue(fieldValue.trim())
+                                : fieldValue.trim(),
                         });
                     }
                     else if (isSymbol(char)) {
