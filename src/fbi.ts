@@ -61,10 +61,14 @@ function isWhitespace(str: string) {
 }
 
 export interface FBIParserOptions {
-    strict?: boolean; // default: true
+    strict: boolean; // default: true
     formatFieldName?: (fieldName: string) => string;    // these formatters are useful for forcing lowercase for example
     formatFieldValue?: (fieldValue: string) => string;
     formatSectionHeader?: (sectionHeader: string) => string;
+}
+
+const DEFAULT_OPTIONS: FBIParserOptions = {
+    strict: true,
 }
 
 export interface FBIParserResult {
@@ -76,9 +80,7 @@ export class FBIParserContext {
     private options: FBIParserOptions;
 
     constructor(options?: FBIParserOptions) {
-        this.options = {
-            strict: options?.strict !== undefined ? options.strict : true,
-        };
+        this.options = options ?? DEFAULT_OPTIONS;
     }
 
     loadResult(data: Buffer): FBIParserResult {
