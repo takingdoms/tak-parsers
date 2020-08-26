@@ -1,46 +1,5 @@
-export interface FBIField {
-    name: string;
-    value: string;
-}
-
-export class FBISection {
-    readonly header: string;
-    readonly fields: FBIField[];
-    readonly sections: FBISection[];
-
-    constructor(name: string) {
-        this.header = name;
-        this.fields = [];
-        this.sections = [];
-    }
-
-    debugPrint(padding: string = '') {
-        console.log(`${padding}[${this.header}]`);
-        console.log(`${padding}Fields: ${this.fields.length}`);
-        this.sections.forEach(section => section.debugPrint(padding + '    '));
-    }
-
-    val(key: string): string {
-        let field = this.fields.find(f => f.name === key);
-        if (field !== undefined)
-            return field.value;
-    }
-
-    get(key: string): FBISection {
-        return this.sections.find(s => s.header === key);
-    }
-
-    toRawObj(): any {
-        let obj: any = {};
-        this.sections.forEach(section => {
-            obj['[' + section.header + ']'] = section.toRawObj();
-        });
-
-        this.fields.forEach(f => obj[f.name] = f.value);
-
-        return obj;
-    }
-}
+import { FBISection } from '.';
+import { FBIParserError } from './fbi-errors';
 
 enum State {
     Content,
@@ -49,16 +8,9 @@ enum State {
 }
 
 const SYMBOLS = ['[', ']', '{', '}', '=', ';'];
-const COMMENT = '//';
-
-function isSymbol(str: string) {
-    return SYMBOLS.some(next => next === str);
-}
-
-function isWhitespace(str: string) {
-    // return str === ' ' || str === '\n' || str === '\t';
-    return str === '\0' || /\s/.test(str);
-}
+const SINGLE_LINE_COMMENT = '//';
+const MULTI_LINE_COMMENT_START = '/*';
+const MULTI_LINE_COMMENT_END = '*/';
 
 export interface FBIParserOptions {
     strict: boolean; // default: true
@@ -95,29 +47,34 @@ export class FBIParserContext {
         let name: string = null;
         let fieldName: string = null;
         let fieldValue: string = null;
-
-        let last: string = null;
+        let insideMultilineComment = false;
 
         outer:for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
             let line = lines[lineIdx];
 
             for (let charIdx = 0; charIdx < line.length; charIdx++) {
                 let char = line[charIdx];
-                last = char;
 
-                for (let comIdx = 0; comIdx < COMMENT.length; comIdx++) {
-                    let testIdx = charIdx + comIdx;
-                    if (testIdx === line.length)
-                        break;
+                if (testWordMatch(MULTI_LINE_COMMENT_END, line, charIdx)) {
+                    insideMultilineComment = false;
+                    // skip the current character + the rest of the multiLineComment word
+                    charIdx += MULTI_LINE_COMMENT_END.length - 1; // -1 is because the 'continue;' below already skips 1 char
+                    continue;
+                }
 
-                    let testChar = line[testIdx];
-                    if (testChar !== COMMENT[comIdx])
-                        break;
+                if (insideMultilineComment) {
+                    continue;
+                }
 
-                    if (comIdx === COMMENT.length - 1) {
-                        // skip the entire line
-                        continue outer;
-                    }
+                if (testWordMatch(MULTI_LINE_COMMENT_START, line, charIdx)) {
+                    insideMultilineComment = true;
+                    // skip the current character + the rest of the multiLineComment word
+                    charIdx += MULTI_LINE_COMMENT_START.length - 1; // -1 is because the 'continue;' below already skips 1 char
+                    continue;
+                }
+
+                if (testWordMatch(SINGLE_LINE_COMMENT, line, charIdx)) {
+                    continue outer; // skip the rest of the line
                 }
 
                 if (state === State.Content) {
@@ -257,33 +214,31 @@ export class FBIParserContext {
     }
 }
 
-export class FBIParserError extends Error {
-    readonly char: string;
-    readonly lineIdx: number;
-    readonly charIdx: number;
-    readonly reason: string;
+function isSymbol(str: string) {
+    return SYMBOLS.some(next => next === str);
+}
 
-    constructor(char: string, lineIdx: number, charIdx: number, reason?: string) {
-        let charSanitized = char;
+function isWhitespace(str: string) {
+    // return str === ' ' || str === '\n' || str === '\t';
+    return str === '\0' || /\s/.test(str);
+}
 
-        [
-            ['\r', '␍'],
-            ['\n', '␤'],
-            ['\0', '␀'],
-        ].forEach(([a, b]) => {
-            charSanitized = charSanitized.replace(a, b);
-        });
+function testWordMatch(word: string, line: string[], charIdx: number) {
+    for (let comIdx = 0; comIdx < word.length; comIdx++) {
+        let testIdx = charIdx + comIdx;
+        if (testIdx === line.length)
+            break;
 
-        let message = `Invalid character "${charSanitized}" at ${lineIdx + 1}:${charIdx + 1}`;
-        if (reason) message += `\n${reason}`;
+        let testChar = line[testIdx];
+        if (testChar !== word[comIdx])
+            break;
 
-        super(message);
-
-        this.char = char;
-        this.lineIdx = lineIdx;
-        this.charIdx = charIdx;
-        this.reason = reason;
+        if (comIdx === word.length - 1) {
+            return true;
+        }
     }
+
+    return false;
 }
 
 // for backward compatibility
